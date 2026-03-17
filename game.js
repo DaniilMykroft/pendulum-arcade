@@ -1,11 +1,11 @@
-// Step 9b: Chain stiffness 1.0 - no stretch
+// Step 9c: Chain length 40px (2.5x shorter)
 
 const GAME_WIDTH  = 390;
 const GAME_HEIGHT = 844;
 
 const PIVOT_Y      = GAME_HEIGHT - 300;
 const CHAIN_LINKS  = 6;
-const CHAIN_LENGTH = 100;
+const CHAIN_LENGTH = 40;  // was 100, now 40
 const LINK_DIST    = CHAIN_LENGTH / CHAIN_LINKS;
 const PADDLE_W     = 90;
 const PADDLE_H     = 12;
@@ -33,7 +33,7 @@ class GameScene extends Phaser.Scene {
       const link = this.matter.add.circle(
         GAME_WIDTH / 2,
         PIVOT_Y + LINK_DIST * (i + 1),
-        4,
+        3,
         {
           mass: 0.2,
           frictionAir: 0.02,
@@ -56,7 +56,6 @@ class GameScene extends Phaser.Scene {
       }
     );
 
-    // pivot -> first link
     World.add(world, Constraint.create({
       bodyA: this.pivot,
       bodyB: this.links[0],
@@ -65,7 +64,6 @@ class GameScene extends Phaser.Scene {
       damping: 0
     }));
 
-    // link -> link
     for (let i = 0; i < CHAIN_LINKS - 1; i++) {
       World.add(world, Constraint.create({
         bodyA: this.links[i],
@@ -76,7 +74,6 @@ class GameScene extends Phaser.Scene {
       }));
     }
 
-    // last link -> paddle end
     World.add(world, Constraint.create({
       bodyA: this.links[CHAIN_LINKS - 1],
       bodyB: this.paddle,
