@@ -1,5 +1,3 @@
-// Step 9e: Fix stretch - higher link density + doubled constraints per segment
-
 const GAME_WIDTH  = 390;
 const GAME_HEIGHT = 844;
 
@@ -33,7 +31,6 @@ class GameScene extends Phaser.Scene {
       collisionFilter: { mask: 0 }
     });
 
-    // Links with high density - same mass as paddle per unit
     this.links = [];
     for (let i = 0; i < CHAIN_LINKS; i++) {
       const link = this.matter.add.circle(
@@ -52,23 +49,23 @@ class GameScene extends Phaser.Scene {
       { density: 0.8, frictionAir: 0.01, frictionAngular: 0.005, restitution: 0.3, collisionFilter: { mask: 0 } }
     );
 
-    // Helper to add doubled constraints (two parallel = much stiffer effectively)
-    const addLink = (bA, bB, pB) => {
-      const opts = { bodyA: bA, bodyB: bB, length: LINK_DIST, stiffness: 1, damping: 0 };
-      if (pB) opts.pointB = pB;
-      World.add(world, Constraint.create(opts));
-      World.add(world, Constraint.create({ ...opts })); // second copy
-    };
+    World.add(world, Constraint.create({
+      bodyA: this.pivot, bodyB: this.links[0],
+      length: LINK_DIST, stiffness: 1, damping: 0
+    }));
 
-    addLink(this.pivot, this.links[0], null);
     for (let i = 0; i < CHAIN_LINKS - 1; i++) {
-      addLink(this.links[i], this.links[i + 1], null);
+      World.add(world, Constraint.create({
+        bodyA: this.links[i], bodyB: this.links[i + 1],
+        length: LINK_DIST, stiffness: 1, damping: 0
+      }));
     }
 
-    // Last link to paddle end - zero length pin
-    const pinOpts = { bodyA: this.links[CHAIN_LINKS-1], bodyB: this.paddle, pointB: { x: -PADDLE_W/2, y: 0 }, length: 0, stiffness: 1, damping: 0 };
-    World.add(world, Constraint.create(pinOpts));
-    World.add(world, Constraint.create({ ...pinOpts }));
+    World.add(world, Constraint.create({
+      bodyA: this.links[CHAIN_LINKS - 1], bodyB: this.paddle,
+      pointB: { x: -PADDLE_W / 2, y: 0 },
+      length: 0, stiffness: 1, damping: 0
+    }));
 
     this.gfx = this.add.graphics();
     this.targetX = GAME_WIDTH / 2;
