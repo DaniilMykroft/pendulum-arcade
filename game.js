@@ -1,12 +1,11 @@
-// Step 2: Pendulum swing + tap to push
+// Step 2b: Pivot follows pointer horizontally, rope+paddle hang freely (360 rotation)
 
 const GAME_WIDTH = 390;
 const GAME_HEIGHT = 844;
 
-// Pendulum config
-const PIVOT_X = GAME_WIDTH / 2;
-const PIVOT_Y = 120;
-const ARM_LENGTH = 180;
+const PIVOT_Y = GAME_HEIGHT - 320;  // pivot is in lower area
+const ROPE_LENGTH = 80;
+const PADDLE_LEN = 70;
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -19,73 +18,83 @@ class GameScene extends Phaser.Scene {
     bg.fillGradientStyle(0x1a1a2e, 0x1a1a2e, 0x16213e, 0x16213e, 1);
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Pendulum state
-    this.angle = -0.6;         // radians, start tilted left
-    this.angleVel = 0;         // angular velocity
-    this.angleDamp = 0.995;    // damping (friction)
-    this.gravity = 0.004;      // pendulum gravity constant
+    // Pivot state
+    this.pivotX = GAME_WIDTH / 2;
+    this.prevPivotX = this.pivotX;
 
-    // Graphics objects
-    this.armLine = this.add.graphics();
-    this.pivotDot = this.add.graphics();
-    this.paddle = this.add.graphics();
+    // Rope angle state (angle from vertical DOWN = 0)
+    this.angle = 0;       // radians
+    this.angleVel = 0;    // angular velocity
+    this.damping = 0.98;  // air friction
+    this.gravity = 0.006; // pulls rope down (toward angle=0)
 
-    // Draw static pivot point
-    this.pivotDot.fillStyle(0xffffff, 0.8);
-    this.pivotDot.fillCircle(PIVOT_X, PIVOT_Y, 6);
+    // Graphics
+    this.gfx = this.add.graphics();
 
-    // Tap/click = push the pendulum
-    this.input.on('pointerdown', (pointer) => {
-      // Push direction depends on which side of center the tap is
-      const push = pointer.x < GAME_WIDTH / 2 ? -0.04 : 0.04;
-      this.angleVel += push;
-    });
-
-    // Hint text
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, 'Tap left / right to push', {
-      fontSize: '18px',
-      color: '#ffffff88',
+    // Hint
+    this.add.text(GAME_WIDTH / 2, 40, 'Move cursor / drag to swing', {
+      fontSize: '16px',
+      color: '#ffffff66',
       align: 'center'
     }).setOrigin(0.5);
+
+    // Track pointer
+    this.input.on('pointermove', (pointer) => {
+      this.pivotX = Phaser.Math.Clamp(pointer.x, 0, GAME_WIDTH);
+    });
+    this.input.on('pointerdown', (pointer) => {
+      this.pivotX = Phaser.Math.Clamp(pointer.x, 0, GAME_WIDTH);
+    });
   }
 
   update() {
-    // Pendulum physics (simple harmonic)
-    this.angleVel += -this.gravity * Math.sin(this.angle);
-    this.angleVel *= this.angleDamp;
+    // Pivot acceleration = delta movement of pivot (inertia transfer)
+    const pivotDeltaX = this.pivotX - this.prevPivotX;
+    this.prevPivotX = this.pivotX;
+
+    // Pendulum equation + pivot acceleration drives swing
+    const gravityTorque = -this.gravity * Math.sin(this.angle);
+    const pivotTorque = -(pivotDeltaX * 0.003) / ROPE_LENGTH;
+    this.angleVel += gravityTorque + pivotTorque;
+    this.angleVel *= this.damping;
     this.angle += this.angleVel;
+    // Full 360 - no clamping
 
-    // Paddle tip position
-    const tipX = PIVOT_X + ARM_LENGTH * Math.sin(this.angle);
-    const tipY = PIVOT_Y + ARM_LENGTH * Math.cos(this.angle);
+    // Rope tip position
+    const ropeEndX = this.pivotX + ROPE_LENGTH * Math.sin(this.angle);
+    const ropeEndY = PIVOT_Y + ROPE_LENGTH * Math.cos(this.angle);
 
-    // Paddle orientation (perpendicular to arm)
-    const paddleLen = 60;
+    // Paddle endpoints (perpendicular to rope direction)
     const perpAngle = this.angle + Math.PI / 2;
-    const px1 = tipX - paddleLen / 2 * Math.cos(perpAngle);
-    const py1 = tipY - paddleLen / 2 * Math.sin(perpAngle);
-    const px2 = tipX + paddleLen / 2 * Math.cos(perpAngle);
-    const py2 = tipY + paddleLen / 2 * Math.sin(perpAngle);
+    const px1 = ropeEndX - PADDLE_LEN / 2 * Math.cos(perpAngle);
+    const py1 = ropeEndY - PADDLE_LEN / 2 * Math.sin(perpAngle);
+    const px2 = ropeEndX + PADDLE_LEN / 2 * Math.cos(perpAngle);
+    const py2 = ropeEndY + PADDLE_LEN / 2 * Math.sin(perpAngle);
 
-    // Redraw arm
-    this.armLine.clear();
-    this.armLine.lineStyle(3, 0xaaaaaa, 0.8);
-    this.armLine.beginPath();
-    this.armLine.moveTo(PIVOT_X, PIVOT_Y);
-    this.armLine.lineTo(tipX, tipY);
-    this.armLine.strokePath();
+    // Draw
+    this.gfx.clear();
 
-    // Redraw paddle
-    this.paddle.clear();
-    this.paddle.lineStyle(10, 0x00d4ff, 1);
-    this.paddle.beginPath();
-    this.paddle.moveTo(px1, py1);
-    this.paddle.lineTo(px2, py2);
-    this.paddle.strokePath();
+    // Pivot point
+    this.gfx.fillStyle(0xffffff, 0.9);
+    this.gfx.fillCircle(this.pivotX, PIVOT_Y, 7);
 
-    // Glow dot at tip
-    this.paddle.fillStyle(0x00d4ff, 1);
-    this.paddle.fillCircle(tipX, tipY, 5);
+    // Rope
+    this.gfx.lineStyle(2, 0xaaaaaa, 0.7);
+    this.gfx.beginPath();
+    this.gfx.moveTo(this.pivotX, PIVOT_Y);
+    this.gfx.lineTo(ropeEndX, ropeEndY);
+    this.gfx.strokePath();
+
+    // Paddle
+    this.gfx.lineStyle(12, 0x00d4ff, 1);
+    this.gfx.beginPath();
+    this.gfx.moveTo(px1, py1);
+    this.gfx.lineTo(px2, py2);
+    this.gfx.strokePath();
+
+    // Glow at rope tip
+    this.gfx.fillStyle(0x00d4ff, 0.6);
+    this.gfx.fillCircle(ropeEndX, ropeEndY, 8);
   }
 }
 
