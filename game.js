@@ -1,4 +1,4 @@
-// Step 9d: More solver iterations = no stretch
+// Step 9e: Fix stretch - higher link density + doubled constraints per segment
 
 const GAME_WIDTH  = 390;
 const GAME_HEIGHT = 844;
@@ -18,11 +18,10 @@ class GameScene extends Phaser.Scene {
     bg.fillGradientStyle(0x1a1a2e, 0x1a1a2e, 0x16213e, 0x16213e, 1);
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Crank up solver iterations
     const engine = this.matter.world.engine;
-    engine.positionIterations = 20;   // default 6
-    engine.velocityIterations = 20;   // default 4
-    engine.constraintIterations = 10; // default 2
+    engine.positionIterations   = 20;
+    engine.velocityIterations   = 20;
+    engine.constraintIterations = 10;
 
     const M          = Phaser.Physics.Matter.Matter;
     const Constraint = M.Constraint;
@@ -34,13 +33,14 @@ class GameScene extends Phaser.Scene {
       collisionFilter: { mask: 0 }
     });
 
+    // Links with high density - same mass as paddle per unit
     this.links = [];
     for (let i = 0; i < CHAIN_LINKS; i++) {
       const link = this.matter.add.circle(
         GAME_WIDTH / 2,
         PIVOT_Y + LINK_DIST * (i + 1),
-        3,
-        { mass: 0.2, frictionAir: 0.02, collisionFilter: { mask: 0 } }
+        4,
+        { density: 0.8, frictionAir: 0.02, collisionFilter: { mask: 0 } }
       );
       this.links.push(link);
     }
@@ -49,26 +49,26 @@ class GameScene extends Phaser.Scene {
       GAME_WIDTH / 2 + PADDLE_W / 2,
       PIVOT_Y + CHAIN_LENGTH,
       PADDLE_W, PADDLE_H,
-      { mass: 3, frictionAir: 0.01, frictionAngular: 0.005, restitution: 0.3, collisionFilter: { mask: 0 } }
+      { density: 0.8, frictionAir: 0.01, frictionAngular: 0.005, restitution: 0.3, collisionFilter: { mask: 0 } }
     );
 
-    World.add(world, Constraint.create({
-      bodyA: this.pivot, bodyB: this.links[0],
-      length: LINK_DIST, stiffness: 1, damping: 0
-    }));
+    // Helper to add doubled constraints (two parallel = much stiffer effectively)
+    const addLink = (bA, bB, pB) => {
+      const opts = { bodyA: bA, bodyB: bB, length: LINK_DIST, stiffness: 1, damping: 0 };
+      if (pB) opts.pointB = pB;
+      World.add(world, Constraint.create(opts));
+      World.add(world, Constraint.create({ ...opts })); // second copy
+    };
 
+    addLink(this.pivot, this.links[0], null);
     for (let i = 0; i < CHAIN_LINKS - 1; i++) {
-      World.add(world, Constraint.create({
-        bodyA: this.links[i], bodyB: this.links[i + 1],
-        length: LINK_DIST, stiffness: 1, damping: 0
-      }));
+      addLink(this.links[i], this.links[i + 1], null);
     }
 
-    World.add(world, Constraint.create({
-      bodyA: this.links[CHAIN_LINKS - 1], bodyB: this.paddle,
-      pointB: { x: -PADDLE_W / 2, y: 0 },
-      length: 0, stiffness: 1, damping: 0
-    }));
+    // Last link to paddle end - zero length pin
+    const pinOpts = { bodyA: this.links[CHAIN_LINKS-1], bodyB: this.paddle, pointB: { x: -PADDLE_W/2, y: 0 }, length: 0, stiffness: 1, damping: 0 };
+    World.add(world, Constraint.create(pinOpts));
+    World.add(world, Constraint.create({ ...pinOpts }));
 
     this.gfx = this.add.graphics();
     this.targetX = GAME_WIDTH / 2;
@@ -133,10 +133,7 @@ const config = {
     default: 'matter',
     matter: {
       gravity: { y: 1 },
-      debug: false,
-      positionIterations: 20,
-      velocityIterations: 20,
-      constraintIterations: 10
+      debug: false
     }
   },
   scene: [GameScene],
