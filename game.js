@@ -1,10 +1,10 @@
-// Step 2c: Rope attaches to END of paddle (not center), rope length halved
+// Step 2d: Correct inertia - pivot acceleration drives pendulum torque
 
 const GAME_WIDTH = 390;
 const GAME_HEIGHT = 844;
 
 const PIVOT_Y = GAME_HEIGHT - 320;
-const ROPE_LENGTH = 40;   // halved from 80
+const ROPE_LENGTH = 40;
 const PADDLE_LEN = 70;
 
 class GameScene extends Phaser.Scene {
@@ -18,14 +18,15 @@ class GameScene extends Phaser.Scene {
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
     this.pivotX = GAME_WIDTH / 2;
+    this.pivotVelX = 0;      // velocity of pivot
+    this.pivotAccX = 0;      // acceleration of pivot
     this.prevPivotX = this.pivotX;
+    this.prevPivotVelX = 0;
 
-    // Angle = rotation of the whole assembly (rope+paddle) around pivot
-    // 0 = rope points straight down, paddle is horizontal
     this.angle = 0;
     this.angleVel = 0;
-    this.damping = 0.98;
-    this.gravity = 0.006;
+    this.damping = 0.985;
+    this.gravity = 0.008;
 
     this.gfx = this.add.graphics();
 
@@ -44,23 +45,31 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    const pivotDeltaX = this.pivotX - this.prevPivotX;
+    // Compute pivot velocity and acceleration
+    this.pivotVelX = this.pivotX - this.prevPivotX;
+    this.pivotAccX = this.pivotVelX - this.prevPivotVelX;
     this.prevPivotX = this.pivotX;
+    this.prevPivotVelX = this.pivotVelX;
 
-    const gravityTorque = -this.gravity * Math.sin(this.angle);
-    const pivotTorque = -(pivotDeltaX * 0.003) / ROPE_LENGTH;
-    this.angleVel += gravityTorque + pivotTorque;
+    // Pendulum equation:
+    // angleAcc = -(g/L)*sin(angle) - (pivotAcc/L)*cos(angle)
+    // The second term is the inertial force from pivot horizontal acceleration
+    const L = ROPE_LENGTH;
+    const angleAcc =
+      -(this.gravity) * Math.sin(this.angle)
+      - (this.pivotAccX * 0.1 / L) * Math.cos(this.angle);
+
+    this.angleVel += angleAcc;
     this.angleVel *= this.damping;
     this.angle += this.angleVel;
 
-    // Rope end = where paddle attaches (one END of paddle)
-    const ropeEndX = this.pivotX + ROPE_LENGTH * Math.sin(this.angle);
-    const ropeEndY = PIVOT_Y + ROPE_LENGTH * Math.cos(this.angle);
+    // Rope end
+    const ropeEndX = this.pivotX + L * Math.sin(this.angle);
+    const ropeEndY = PIVOT_Y + L * Math.cos(this.angle);
 
-    // Paddle goes from ropeEnd OUTWARD (rope attaches to one end of paddle)
-    // Paddle direction = perpendicular to rope
+    // Paddle from rope end outward, perpendicular to rope
     const perpAngle = this.angle + Math.PI / 2;
-    const px1 = ropeEndX;  // rope attachment end
+    const px1 = ropeEndX;
     const py1 = ropeEndY;
     const px2 = ropeEndX + PADDLE_LEN * Math.cos(perpAngle);
     const py2 = ropeEndY + PADDLE_LEN * Math.sin(perpAngle);
@@ -78,14 +87,14 @@ class GameScene extends Phaser.Scene {
     this.gfx.lineTo(ropeEndX, ropeEndY);
     this.gfx.strokePath();
 
-    // Paddle (from rope end outward)
+    // Paddle
     this.gfx.lineStyle(12, 0x00d4ff, 1);
     this.gfx.beginPath();
     this.gfx.moveTo(px1, py1);
     this.gfx.lineTo(px2, py2);
     this.gfx.strokePath();
 
-    // Dot at rope-to-paddle joint
+    // Joint dot
     this.gfx.fillStyle(0x00d4ff, 0.8);
     this.gfx.fillCircle(ropeEndX, ropeEndY, 6);
   }
