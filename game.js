@@ -1,10 +1,12 @@
-// Step 3b: Stronger gravity
+// Step 3c: Heavier bob feel - larger, less responsive to pivot movement
 
 const GAME_WIDTH = 390;
 const GAME_HEIGHT = 844;
 
 const PIVOT_Y = GAME_HEIGHT - 300;
 const ROPE_LENGTH = 100;
+const BOB_RADIUS = 18;    // bigger = looks heavier
+const BOB_MASS = 8;       // higher = less impulse from pivot
 
 class GameScene extends Phaser.Scene {
   constructor() {
@@ -23,7 +25,7 @@ class GameScene extends Phaser.Scene {
     this.angle = 0;
     this.angleVel = 0;
     this.damping = 0.992;
-    this.gravity = 0.04;   // ~8x stronger than before
+    this.gravity = 0.04;
 
     this.gfx = this.add.graphics();
 
@@ -32,14 +34,15 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    const pivotVelX  = this.pivotX - this.prevPivotX;
-    const pivotAccX  = pivotVelX   - this.prevPivotVelX;
+    const pivotVelX = this.pivotX - this.prevPivotX;
+    const pivotAccX = pivotVelX   - this.prevPivotVelX;
     this.prevPivotX    = this.pivotX;
     this.prevPivotVelX = pivotVelX;
 
     const L = ROPE_LENGTH;
+    // Divide impulse by BOB_MASS - heavier bob = less reactive to pivot
     this.angleVel += -(this.gravity / L) * Math.sin(this.angle)
-                   - (pivotAccX * 0.4 / L) * Math.cos(this.angle);
+                   - (pivotAccX * 0.4 / L / BOB_MASS) * Math.cos(this.angle);
     this.angleVel *= this.damping;
     this.angle    += this.angleVel;
 
@@ -48,17 +51,20 @@ class GameScene extends Phaser.Scene {
 
     this.gfx.clear();
 
+    // Pivot
     this.gfx.fillStyle(0xffffff, 0.9);
     this.gfx.fillCircle(this.pivotX, PIVOT_Y, 7);
 
+    // Rope
     this.gfx.lineStyle(2, 0xcccccc, 0.8);
     this.gfx.beginPath();
     this.gfx.moveTo(this.pivotX, PIVOT_Y);
     this.gfx.lineTo(bobX, bobY);
     this.gfx.strokePath();
 
+    // Bob
     this.gfx.fillStyle(0x00d4ff, 1);
-    this.gfx.fillCircle(bobX, bobY, 10);
+    this.gfx.fillCircle(bobX, bobY, BOB_RADIUS);
   }
 }
 
