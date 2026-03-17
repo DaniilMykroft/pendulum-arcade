@@ -1,4 +1,4 @@
-// Step 5b: Rope attaches to END of paddle (nunchaku), stiffness back to 0.9
+// Step 5c: Fix endless spinning - use Body.setVelocity for pivot movement
 
 const GAME_WIDTH  = 390;
 const GAME_HEIGHT = 844;
@@ -20,10 +20,11 @@ class GameScene extends Phaser.Scene {
     const Constraint = MatterLib.Constraint;
     const World      = MatterLib.World;
 
-    // Pivot: static, follows cursor
+    // Pivot: kinematic (isStatic but we'll teleport it cleanly)
     this.pivotBody = this.matter.add.circle(GAME_WIDTH / 2, PIVOT_Y, 5, {
       isStatic: true,
-      collisionFilter: { mask: 0 }
+      collisionFilter: { mask: 0 },
+      label: 'pivot'
     });
 
     // Paddle: dynamic rectangle
@@ -33,35 +34,40 @@ class GameScene extends Phaser.Scene {
       PADDLE_W, PADDLE_H,
       {
         mass: 5,
-        frictionAir: 0.008,
+        frictionAir: 0.02,
+        frictionAngular: 0.02,
         restitution: 0.3,
         collisionFilter: { mask: 0 }
       }
     );
 
-    // Rope attaches to LEFT END of paddle (pointB.x = -PADDLE_W/2)
+    // Rope: attach to left end of paddle
     this.rope = Constraint.create({
       bodyA: this.pivotBody,
       bodyB: this.paddleBody,
-      pointB: { x: -PADDLE_W / 2, y: 0 },  // left end of paddle
+      pointB: { x: -PADDLE_W / 2, y: 0 },
       length: ROPE_LENGTH,
       stiffness: 0.9,
-      damping: 0.05
+      damping: 0.1
     });
     World.add(this.matter.world.localWorld, this.rope);
 
     this.gfx = this.add.graphics();
 
     this.targetX = GAME_WIDTH / 2;
+    this.pivotX  = GAME_WIDTH / 2;
+
     this.input.on('pointermove', (p) => { this.targetX = Phaser.Math.Clamp(p.x, 0, GAME_WIDTH); });
     this.input.on('pointerdown',  (p) => { this.targetX = Phaser.Math.Clamp(p.x, 0, GAME_WIDTH); });
   }
 
   update() {
-    Phaser.Physics.Matter.Matter.Body.setPosition(this.pivotBody, {
-      x: this.targetX,
-      y: PIVOT_Y
-    });
+    const MatterLib = Phaser.Physics.Matter.Matter;
+
+    // Move pivot smoothly via position (static body teleport is fine if we also zero velocity)
+    MatterLib.Body.setPosition(this.pivotBody, { x: this.targetX, y: PIVOT_Y });
+    MatterLib.Body.setVelocity(this.pivotBody, { x: 0, y: 0 });  // prevent impulse buildup
+    MatterLib.Body.setAngularVelocity(this.pivotBody, 0);
 
     const px = this.pivotBody.position.x;
     const py = this.pivotBody.position.y;
@@ -69,7 +75,7 @@ class GameScene extends Phaser.Scene {
     const by = this.paddleBody.position.y;
     const angle = this.paddleBody.angle;
 
-    // World position of rope attachment point (left end of paddle)
+    // World position of rope attachment (left end of paddle)
     const attachX = bx + Math.cos(angle) * (-PADDLE_W / 2);
     const attachY = by + Math.sin(angle) * (-PADDLE_W / 2);
 
@@ -79,14 +85,14 @@ class GameScene extends Phaser.Scene {
     this.gfx.fillStyle(0xffffff, 0.9);
     this.gfx.fillCircle(px, py, 7);
 
-    // Rope
+    // Rope line
     this.gfx.lineStyle(2, 0xcccccc, 0.8);
     this.gfx.beginPath();
     this.gfx.moveTo(px, py);
     this.gfx.lineTo(attachX, attachY);
     this.gfx.strokePath();
 
-    // Paddle (rotated)
+    // Paddle
     this.gfx.save();
     this.gfx.translateCanvas(bx, by);
     this.gfx.rotateCanvas(angle);
@@ -94,7 +100,7 @@ class GameScene extends Phaser.Scene {
     this.gfx.fillRect(-PADDLE_W / 2, -PADDLE_H / 2, PADDLE_W, PADDLE_H);
     this.gfx.restore();
 
-    // Dot at attachment point
+    // Attachment dot
     this.gfx.fillStyle(0xffffff, 0.7);
     this.gfx.fillCircle(attachX, attachY, 4);
   }
