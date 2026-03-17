@@ -1,9 +1,4 @@
-// Step 8: Nunchaku physics
-// pivot (static, follows cursor)
-//   | rope constraint
-// hinge (small dynamic circle)
-//   | joint constraint (zero length)
-// paddle (rectangle, end attached to hinge)
+// Step 8b: Rope stiffness 0.98 - almost inextensible
 
 const GAME_WIDTH  = 390;
 const GAME_HEIGHT = 844;
@@ -26,44 +21,40 @@ class GameScene extends Phaser.Scene {
     const World      = M.World;
     const world      = this.matter.world.localWorld;
 
-    // 1. PIVOT - static, follows cursor
     this.pivot = this.matter.add.circle(GAME_WIDTH / 2, PIVOT_Y, 5, {
       isStatic: true,
       collisionFilter: { mask: 0 }
     });
 
-    // 2. HINGE - small dynamic circle, hangs below pivot on rope
     this.hinge = this.matter.add.circle(GAME_WIDTH / 2, PIVOT_Y + ROPE_LENGTH, 5, {
       mass: 0.1,
       frictionAir: 0.02,
       collisionFilter: { mask: 0 }
     });
 
-    // 3. PADDLE - rectangle, left end will be pinned to hinge
-    //    Start with left end at hinge position
     this.paddle = this.matter.add.rectangle(
-      GAME_WIDTH / 2 + PADDLE_W / 2,  // center = hinge + half paddle
+      GAME_WIDTH / 2 + PADDLE_W / 2,
       PIVOT_Y + ROPE_LENGTH,
       PADDLE_W, PADDLE_H,
       {
         mass: 3,
         frictionAir: 0.01,
-        frictionAngular: 0.005,  // very low - paddle spins freely
+        frictionAngular: 0.005,
         restitution: 0.3,
         collisionFilter: { mask: 0 }
       }
     );
 
-    // ROPE: pivot → hinge
+    // Rope: stiffness 0.98 - almost no stretch
     World.add(world, Constraint.create({
       bodyA: this.pivot,
       bodyB: this.hinge,
       length: ROPE_LENGTH,
-      stiffness: 1,
+      stiffness: 0.98,
       damping: 0
     }));
 
-    // JOINT: hinge → left end of paddle (pin joint, length=0)
+    // Pin joint hinge -> paddle end
     World.add(world, Constraint.create({
       bodyA: this.hinge,
       bodyB: this.paddle,
@@ -92,17 +83,13 @@ class GameScene extends Phaser.Scene {
     const by = this.paddle.position.y;
     const angle = this.paddle.angle;
 
-    // Left end of paddle in world coords
-    const endX = bx + Math.cos(angle) * (-PADDLE_W / 2) - Math.sin(angle) * 0;
-    const endY = by + Math.sin(angle) * (-PADDLE_W / 2) + Math.cos(angle) * 0;
-
     this.gfx.clear();
 
     // Pivot
     this.gfx.fillStyle(0xffffff, 0.9);
     this.gfx.fillCircle(px, py, 7);
 
-    // Rope (pivot → hinge)
+    // Rope
     this.gfx.lineStyle(2, 0xcccccc, 0.8);
     this.gfx.beginPath();
     this.gfx.moveTo(px, py);
