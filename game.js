@@ -1,11 +1,11 @@
-// Step 9: Chain of 6 links + paddle (nunchaku)
+// Step 9b: Chain stiffness 1.0 - no stretch
 
 const GAME_WIDTH  = 390;
 const GAME_HEIGHT = 844;
 
 const PIVOT_Y      = GAME_HEIGHT - 300;
 const CHAIN_LINKS  = 6;
-const CHAIN_LENGTH = 100;  // total rope length
+const CHAIN_LENGTH = 100;
 const LINK_DIST    = CHAIN_LENGTH / CHAIN_LINKS;
 const PADDLE_W     = 90;
 const PADDLE_H     = 12;
@@ -23,13 +23,11 @@ class GameScene extends Phaser.Scene {
     const World      = M.World;
     const world      = this.matter.world.localWorld;
 
-    // PIVOT
     this.pivot = this.matter.add.circle(GAME_WIDTH / 2, PIVOT_Y, 5, {
       isStatic: true,
       collisionFilter: { mask: 0 }
     });
 
-    // CHAIN LINKS
     this.links = [];
     for (let i = 0; i < CHAIN_LINKS; i++) {
       const link = this.matter.add.circle(
@@ -45,7 +43,6 @@ class GameScene extends Phaser.Scene {
       this.links.push(link);
     }
 
-    // PADDLE
     this.paddle = this.matter.add.rectangle(
       GAME_WIDTH / 2 + PADDLE_W / 2,
       PIVOT_Y + CHAIN_LENGTH,
@@ -59,27 +56,27 @@ class GameScene extends Phaser.Scene {
       }
     );
 
-    // Constraint: pivot -> first link
+    // pivot -> first link
     World.add(world, Constraint.create({
       bodyA: this.pivot,
       bodyB: this.links[0],
       length: LINK_DIST,
-      stiffness: 0.9,
-      damping: 0.1
+      stiffness: 1,
+      damping: 0
     }));
 
-    // Constraints: link -> link
+    // link -> link
     for (let i = 0; i < CHAIN_LINKS - 1; i++) {
       World.add(world, Constraint.create({
         bodyA: this.links[i],
         bodyB: this.links[i + 1],
         length: LINK_DIST,
-        stiffness: 0.9,
-        damping: 0.1
+        stiffness: 1,
+        damping: 0
       }));
     }
 
-    // Constraint: last link -> left end of paddle
+    // last link -> paddle end
     World.add(world, Constraint.create({
       bodyA: this.links[CHAIN_LINKS - 1],
       bodyB: this.paddle,
@@ -108,11 +105,9 @@ class GameScene extends Phaser.Scene {
 
     this.gfx.clear();
 
-    // Pivot
     this.gfx.fillStyle(0xffffff, 0.9);
     this.gfx.fillCircle(px, py, 7);
 
-    // Chain links + lines between them
     this.gfx.lineStyle(2, 0xcccccc, 0.9);
     let prevX = px, prevY = py;
     for (let i = 0; i < this.links.length; i++) {
@@ -128,18 +123,14 @@ class GameScene extends Phaser.Scene {
       prevY = ly;
     }
 
-    // Last link -> paddle attach point
-    const lastLx = this.links[CHAIN_LINKS - 1].position.x;
-    const lastLy = this.links[CHAIN_LINKS - 1].position.y;
     const attachX = bx + Math.cos(angle) * (-PADDLE_W / 2);
     const attachY = by + Math.sin(angle) * (-PADDLE_W / 2);
     this.gfx.lineStyle(2, 0xcccccc, 0.9);
     this.gfx.beginPath();
-    this.gfx.moveTo(lastLx, lastLy);
+    this.gfx.moveTo(prevX, prevY);
     this.gfx.lineTo(attachX, attachY);
     this.gfx.strokePath();
 
-    // Paddle
     this.gfx.save();
     this.gfx.translateCanvas(bx, by);
     this.gfx.rotateCanvas(angle);
