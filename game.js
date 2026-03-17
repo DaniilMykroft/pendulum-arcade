@@ -1,4 +1,4 @@
-// Step 2d: Correct inertia - pivot acceleration drives pendulum torque
+// Step 2e: Tuned for full 360 spin on fast movement
 
 const GAME_WIDTH = 390;
 const GAME_HEIGHT = 844;
@@ -18,19 +18,18 @@ class GameScene extends Phaser.Scene {
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
     this.pivotX = GAME_WIDTH / 2;
-    this.pivotVelX = 0;      // velocity of pivot
-    this.pivotAccX = 0;      // acceleration of pivot
+    this.pivotVelX = 0;
     this.prevPivotX = this.pivotX;
     this.prevPivotVelX = 0;
 
     this.angle = 0;
     this.angleVel = 0;
-    this.damping = 0.985;
-    this.gravity = 0.008;
+    this.damping = 0.995;   // less friction - spin persists longer
+    this.gravity = 0.003;   // weaker gravity - easier to overcome for full spin
 
     this.gfx = this.add.graphics();
 
-    this.add.text(GAME_WIDTH / 2, 40, 'Move cursor / drag to swing', {
+    this.add.text(GAME_WIDTH / 2, 40, 'Move fast to spin 360°', {
       fontSize: '16px',
       color: '#ffffff66',
       align: 'center'
@@ -45,29 +44,24 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    // Compute pivot velocity and acceleration
     this.pivotVelX = this.pivotX - this.prevPivotX;
-    this.pivotAccX = this.pivotVelX - this.prevPivotVelX;
+    const pivotAccX = this.pivotVelX - this.prevPivotVelX;
     this.prevPivotX = this.pivotX;
     this.prevPivotVelX = this.pivotVelX;
 
-    // Pendulum equation:
-    // angleAcc = -(g/L)*sin(angle) - (pivotAcc/L)*cos(angle)
-    // The second term is the inertial force from pivot horizontal acceleration
+    // Stronger impulse transfer: coefficient 0.6 instead of 0.1
     const L = ROPE_LENGTH;
     const angleAcc =
       -(this.gravity) * Math.sin(this.angle)
-      - (this.pivotAccX * 0.1 / L) * Math.cos(this.angle);
+      - (pivotAccX * 0.6 / L) * Math.cos(this.angle);
 
     this.angleVel += angleAcc;
     this.angleVel *= this.damping;
     this.angle += this.angleVel;
 
-    // Rope end
     const ropeEndX = this.pivotX + L * Math.sin(this.angle);
     const ropeEndY = PIVOT_Y + L * Math.cos(this.angle);
 
-    // Paddle from rope end outward, perpendicular to rope
     const perpAngle = this.angle + Math.PI / 2;
     const px1 = ropeEndX;
     const py1 = ropeEndY;
