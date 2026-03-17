@@ -1,4 +1,4 @@
-// Step 6: Stable base from Step 4, bob -> paddle, center attachment
+// Step 7: Rope attaches to END of paddle - nunchaku style
 
 const GAME_WIDTH  = 390;
 const GAME_HEIGHT = 844;
@@ -26,28 +26,28 @@ class GameScene extends Phaser.Scene {
       collisionFilter: { mask: 0 }
     });
 
-    // Paddle: dynamic rectangle, starts directly below pivot
+    // Paddle starts hanging below pivot, slightly offset so it has a side to hang from
     this.paddleBody = this.matter.add.rectangle(
-      GAME_WIDTH / 2,
+      GAME_WIDTH / 2 + PADDLE_W / 2,  // center of paddle offset so left end is under pivot
       PIVOT_Y + ROPE_LENGTH,
       PADDLE_W, PADDLE_H,
       {
         mass: 5,
         frictionAir: 0.01,
-        frictionAngular: 0.01,
+        frictionAngular: 0.05,
         restitution: 0.2,
         collisionFilter: { mask: 0 }
       }
     );
 
-    // Rope: center attachment - same as working Step 4
+    // Rope attaches to LEFT end of paddle
     this.rope = Constraint.create({
       bodyA: this.pivotBody,
       bodyB: this.paddleBody,
-      pointB: { x: 0, y: 0 },  // center of paddle
+      pointB: { x: -PADDLE_W / 2, y: 0 },
       length: ROPE_LENGTH,
       stiffness: 1,
-      damping: 0
+      damping: 0.1
     });
     World.add(this.matter.world.localWorld, this.rope);
 
@@ -69,6 +69,10 @@ class GameScene extends Phaser.Scene {
     const by = this.paddleBody.position.y;
     const angle = this.paddleBody.angle;
 
+    // World coords of rope attachment point (left end of paddle)
+    const attachX = bx + Math.cos(angle) * (-PADDLE_W / 2) - Math.sin(angle) * 0;
+    const attachY = by + Math.sin(angle) * (-PADDLE_W / 2) + Math.cos(angle) * 0;
+
     this.gfx.clear();
 
     // Pivot dot
@@ -79,16 +83,20 @@ class GameScene extends Phaser.Scene {
     this.gfx.lineStyle(2, 0xcccccc, 0.8);
     this.gfx.beginPath();
     this.gfx.moveTo(px, py);
-    this.gfx.lineTo(bx, by);
+    this.gfx.lineTo(attachX, attachY);
     this.gfx.strokePath();
 
-    // Paddle (rotated)
+    // Paddle
     this.gfx.save();
     this.gfx.translateCanvas(bx, by);
     this.gfx.rotateCanvas(angle);
     this.gfx.fillStyle(0x00d4ff, 1);
     this.gfx.fillRect(-PADDLE_W / 2, -PADDLE_H / 2, PADDLE_W, PADDLE_H);
     this.gfx.restore();
+
+    // Attachment dot
+    this.gfx.fillStyle(0xffffff, 0.8);
+    this.gfx.fillCircle(attachX, attachY, 4);
   }
 }
 
