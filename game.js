@@ -1,4 +1,5 @@
-// Step 2e: Tuned for full 360 spin on fast movement
+// Step 2f: Fix paddle direction - rope and paddle always consistent
+// Rope hangs from pivot, paddle is perpendicular at rope end, attached at one end
 
 const GAME_WIDTH = 390;
 const GAME_HEIGHT = 844;
@@ -18,55 +19,59 @@ class GameScene extends Phaser.Scene {
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
     this.pivotX = GAME_WIDTH / 2;
-    this.pivotVelX = 0;
     this.prevPivotX = this.pivotX;
     this.prevPivotVelX = 0;
 
+    // angle = rotation of rope from pointing straight DOWN (0)
+    // positive = clockwise
     this.angle = 0;
     this.angleVel = 0;
-    this.damping = 0.995;   // less friction - spin persists longer
-    this.gravity = 0.003;   // weaker gravity - easier to overcome for full spin
+    this.damping = 0.990;
+    this.gravity = 0.006;
 
     this.gfx = this.add.graphics();
 
     this.add.text(GAME_WIDTH / 2, 40, 'Move fast to spin 360°', {
       fontSize: '16px',
       color: '#ffffff66',
-      align: 'center'
     }).setOrigin(0.5);
 
-    this.input.on('pointermove', (pointer) => {
-      this.pivotX = Phaser.Math.Clamp(pointer.x, 0, GAME_WIDTH);
-    });
-    this.input.on('pointerdown', (pointer) => {
-      this.pivotX = Phaser.Math.Clamp(pointer.x, 0, GAME_WIDTH);
-    });
+    this.input.on('pointermove', (p) => { this.pivotX = Phaser.Math.Clamp(p.x, 0, GAME_WIDTH); });
+    this.input.on('pointerdown', (p) => { this.pivotX = Phaser.Math.Clamp(p.x, 0, GAME_WIDTH); });
   }
 
   update() {
-    this.pivotVelX = this.pivotX - this.prevPivotX;
-    const pivotAccX = this.pivotVelX - this.prevPivotVelX;
+    const pivotVelX = this.pivotX - this.prevPivotX;
+    const pivotAccX = pivotVelX - this.prevPivotVelX;
     this.prevPivotX = this.pivotX;
-    this.prevPivotVelX = this.pivotVelX;
+    this.prevPivotVelX = pivotVelX;
 
-    // Stronger impulse transfer: coefficient 0.6 instead of 0.1
     const L = ROPE_LENGTH;
     const angleAcc =
-      -(this.gravity) * Math.sin(this.angle)
-      - (pivotAccX * 0.6 / L) * Math.cos(this.angle);
+      -(this.gravity / L) * Math.sin(this.angle)
+      - (pivotAccX * 0.5 / L) * Math.cos(this.angle);
 
     this.angleVel += angleAcc;
     this.angleVel *= this.damping;
     this.angle += this.angleVel;
 
-    const ropeEndX = this.pivotX + L * Math.sin(this.angle);
-    const ropeEndY = PIVOT_Y + L * Math.cos(this.angle);
+    // Rope direction vector (unit)
+    const rx = Math.sin(this.angle);
+    const ry = Math.cos(this.angle);  // positive Y = down
 
-    const perpAngle = this.angle + Math.PI / 2;
+    // Rope end point
+    const ropeEndX = this.pivotX + L * rx;
+    const ropeEndY = PIVOT_Y + L * ry;
+
+    // Paddle is perpendicular to rope, attached at ropeEnd (one end of paddle)
+    // Perpendicular to (rx, ry) = (-ry, rx)  -- always 90deg clockwise from rope
+    const pdx = -ry;
+    const pdy = rx;
+
     const px1 = ropeEndX;
     const py1 = ropeEndY;
-    const px2 = ropeEndX + PADDLE_LEN * Math.cos(perpAngle);
-    const py2 = ropeEndY + PADDLE_LEN * Math.sin(perpAngle);
+    const px2 = ropeEndX + PADDLE_LEN * pdx;
+    const py2 = ropeEndY + PADDLE_LEN * pdy;
 
     this.gfx.clear();
 
@@ -75,7 +80,7 @@ class GameScene extends Phaser.Scene {
     this.gfx.fillCircle(this.pivotX, PIVOT_Y, 7);
 
     // Rope
-    this.gfx.lineStyle(2, 0xaaaaaa, 0.7);
+    this.gfx.lineStyle(2, 0xaaaaaa, 0.8);
     this.gfx.beginPath();
     this.gfx.moveTo(this.pivotX, PIVOT_Y);
     this.gfx.lineTo(ropeEndX, ropeEndY);
@@ -89,7 +94,7 @@ class GameScene extends Phaser.Scene {
     this.gfx.strokePath();
 
     // Joint dot
-    this.gfx.fillStyle(0x00d4ff, 0.8);
+    this.gfx.fillStyle(0x00d4ff, 0.9);
     this.gfx.fillCircle(ropeEndX, ropeEndY, 6);
   }
 }
